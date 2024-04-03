@@ -1,8 +1,8 @@
 # 导入包
 import pandas as pd
-import akshare as ak
 import streamlit as st
 import riskfolio as rp
+from fund_portfolio import *
 # 在matplotlib绘图中显示中文和负号
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -12,60 +12,7 @@ plt.rcParams["font.sans-serif"]=["SimHei"] # 设置字体
 plt.rcParams['axes.unicode_minus'] = False   # 解决坐标轴负数的负号显示问题
 
 
-
-# 定义函数，获取基金数据并获取某一年之前的基金列表
-@st.cache_data
-def get_fund_info(sw_index_list,year, return_fund_df=False):
-
-    fund_df = pd.DataFrame()
-    # 逐个获取指数行情数据
-    i = 0
-    for code in sw_index_list:
-        bars = ak.fund_individual_basic_info_xq(symbol=code)
-        bars.index = bars['item']
-        fund_df[code] = bars['value']
-        i += 1
-        print(f"\r已获取[{i}/{len(sw_index_list)}]支基金的数据", end="")  # 输出处理进度
-    fund_df.columns = sw_index_list
-
-    # 获取某一年之前的基金列表
-    fund_df_filtered = fund_df.loc['成立时间']
-    # 将Series转换为DataFrame
-    df = fund_df_filtered.reset_index()
-    df.columns = ['index', 'date']
-    # 将日期字符串转换为datetime对象
-    df['date'] = pd.to_datetime(df['date'])
-    df_before_data = df[df['date'].dt.year < year]
-
-    # 输出最后的列表
-    index_list = df_before_data['index'].tolist()
-
-    if return_fund_df:
-        return fund_df, index_list
-    else:
-        return index_list
-
-
-# 定义函数，获取基金价格数据
-@st.cache_data
-def get_fund_price(index_list):
-    price_df = pd.DataFrame()
-    # 逐个获取指数行情数据
-    i = 0
-    for code in index_list:
-        bars = ak.fund_open_fund_info_em(symbol=code, indicator="累计净值走势")
-        bars['净值日期'] = pd.to_datetime(bars['净值日期']).dt.strftime('%Y-%m-%d')
-        bars.index = pd.to_datetime(bars['净值日期'])
-        price_df[code] = bars['累计净值']
-        i += 1
-        print("\r已获取[{}/{}]支基金的数据".format(i, len(index_list)), end="")  # 输出处理进度
-    price_df.columns = index_list
-
-    return price_df
-
-
-# 确认入池
-sw_index_list = ['040046',
+index_list = ['040046',
                      '007380',
                      '015016',
                      '013308',
@@ -75,45 +22,29 @@ sw_index_list = ['040046',
                      '005613',
                      '007721',
                      '008763',
-                     #'001668', # 汇添富全球互联混合（和纳100相关性太高）
+                     '001668', # 汇添富全球互联混合（和纳100相关性太高）
                      '006282',
-                     #'000043', # 嘉实美国成长（和纳100相关性太高）
+                     '000043', # 嘉实美国成长（和纳100相关性太高）
                      '164701',
-                    # '164824', # 印度（目前暂停买入）
+                     '164824', # 印度（目前暂停买入）
                      '519191',
                      '000893', # 工银创新动力
                      '001593',
                      ]
 
-# 创建一个文本输入框，用户可以输入新的产品代码
-new_code = st.text_input("Enter a new product code to add:")
+price_df = read_and_merge_fund_price(index_list)
 
-# 创建一个按钮，用户可以点击添加新的产品代码
-if st.button("Add Product Code"):
-    if new_code:
-        sw_index_list.append(new_code)
-        st.success(f"Product code '{new_code}' added successfully.")
- # 创建一个文本输入框，用户可以输入要删除的产品代码
-code_to_remove = st.text_input("Enter a product code to remove:")
-# 创建一个按钮，用户可以点击删除现有的产品代码
-if st.button("Remove Product Code"):
-    if code_to_remove in sw_index_list:
-        sw_index_list.remove(code_to_remove)
-        st.success(f"Product code '{code_to_remove}' removed successfully.")
-    else:
-        st.error(f"Product code '{code_to_remove}' not found in the list.")
+st.title('资产组合投资分析-基金版本')
 
-# 输出某一年之前的基金列表
-st.title("入池基金基本信息")
-year = 2024
-fund_df, index_list = get_fund_info(sw_index_list,year, return_fund_df=True)
-st.write(fund_df)
+st.markdown("## 基金基本信息")
+fund_info = pd.read_csv('data/fund_data.csv')
+st.write(fund_info)
+st.markdown("## 基金全部历史价格信息")
+st.write(price_df)
 
-# 输出资产池的历史价格
-st.title("资产池历史价格")
 
-price_df = get_fund_price(index_list)
-# 选取指定当日往回24个月范围的数据
+# # 选取指定当日往回24个月范围的数据
+st.markdown("## 选取当日往回24个月范围的数据进行分析")
 from datetime import datetime, timedelta
 current_date = datetime.now()
 # 计算24个月前的日期
@@ -122,7 +53,7 @@ start_date_str = start_date.strftime('%Y-%m-%d')
 end_date_str = current_date.strftime('%Y-%m-%d')
 price_df = price_df[(price_df.index >= start_date_str) & (price_df.index <= end_date_str)]
 st.write(price_df)
-
+#
 st.title("最优组合及权重")
 # 计算资产收益率Y：
 Y = price_df.pct_change().dropna()
@@ -144,7 +75,8 @@ l = 0  # Risk aversion factor, only useful when obj is 'Utility'
 w = port.optimization(model=model, rm=rm, obj=obj, rf=rf, l=l, hist=hist)
 w_new = w.copy()
 w_new['权重'] = round(w['weights']*100,2)
-w_name=fund_df.loc['基金名称'].pipe(pd.DataFrame)
+fund_info.set_index('item', inplace=True)
+w_name=fund_info.loc['基金名称'].pipe(pd.DataFrame)
 folio = pd.concat([w_new,w_name],axis=1)
 folio = folio[folio['权重'] > 0].sort_values('权重', ascending=False)
 
