@@ -16,3 +16,11 @@ riskfolio_tools 是使用streamlit进行前端的分析工具，用于分析资�
 - streamlit
 - cvxpy
 - riskfolio-lib
+
+## 使用说明
+先运行fund_download.py文件，该文件用于下载基金数据，并保存到本地。
+
+启动软件：
+```
+python main.py
+```
