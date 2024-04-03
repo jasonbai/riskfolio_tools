@@ -2,7 +2,7 @@
 import pandas as pd
 import akshare as ak
 import streamlit as st
-from fund_portfolio import *
+from common_functions import *
 
 # 确定要分析的基金
 sw_index_list = ['040046',

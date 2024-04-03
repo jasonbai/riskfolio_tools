@@ -3,7 +3,7 @@ import pandas as pd
 import akshare as ak
 import streamlit as st
 import riskfolio as rp
-from fund_portfolio import *
+from common_functions import *
 # 在matplotlib绘图中显示中文和负号
 import matplotlib.pyplot as plt
 import matplotlib as mpl
